@@ -68,7 +68,7 @@ private:
 			top_vel += divergence_vectors_x[XYtoIndex(x_index + 1, y_index, grid_dimension + 1)] * (x_offset);
 		}
 
-		if (pos.y < grid_dimension - 1.5f && pos.y > 0.5f && x_index < grid_dimension)
+		if (pos.y < grid_dimension - 0.5f && pos.y > 0.5f && x_index < grid_dimension)
 		{
 			bottom_vel += divergence_vectors_x[XYtoIndex(x_index, y_index + 1, grid_dimension + 1)] * (1.0f - x_offset);
 			bottom_vel += divergence_vectors_x[XYtoIndex(x_index + 1, y_index + 1, grid_dimension + 1)] * (x_offset);
@@ -106,7 +106,7 @@ private:
 			left_vel += divergence_vectors_y[XYtoIndex(x_index, y_index + 1, grid_dimension)] * (y_offset);
 		}
 
-		if (pos.x < grid_dimension - 1.5f && pos.x > 0.5f && y_index < grid_dimension)
+		if (pos.x < grid_dimension - 0.5f && pos.x > 0.5f && y_index < grid_dimension)
 		{
 			right_vel += divergence_vectors_y[XYtoIndex(x_index + 1, y_index, grid_dimension)] * (1.0f - y_offset);
 			right_vel += divergence_vectors_y[XYtoIndex(x_index + 1, y_index + 1, grid_dimension)] * (y_offset);
