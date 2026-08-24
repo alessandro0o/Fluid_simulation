@@ -1,6 +1,6 @@
 #pragma once
 
-static constexpr int grid_dimension = 40;
+static constexpr int grid_dimension = 32;
 static constexpr int grid_dimension_sqr = grid_dimension * grid_dimension;
 static constexpr int vector_num = grid_dimension * (grid_dimension + 1);
 static constexpr float cell_size = WINDOW_HEIGHT / grid_dimension;
@@ -178,35 +178,37 @@ public:
 		unload_cell_grid_texture();
 	};
 
-	void velocity_setter(float delta_time)
+	const unsigned int solver_iterations = 30;
+
+	void velocity_setter()
 	{
-		const float vel = 5.0f;
+		const float vel = 20.0f;
 
 		for (size_t i = grid_dimension_sqr / 2 - grid_dimension / 3; i < grid_dimension_sqr / 2 - grid_dimension / 5 + grid_dimension / 2; i++)
 		{
-			if (IsKeyDown(KEY_Q))
+			if (IsKeyPressed(KEY_Q))
 			{
-				divergence_vectors_x[i] -= vel * delta_time;
-				divergence_vectors_x[i + grid_dimension + 1] -= vel * delta_time;
+				divergence_vectors_x[i] -= vel;
+				divergence_vectors_x[i + grid_dimension + 1] -= vel;
 				//divergence_vectors_x[i + 2 * grid_dimension + 2] -= vel * delta_time;
 				//divergence_vectors_x[i + 3 * grid_dimension + 3] -= vel * delta_time;
 			}
-			else if (IsKeyDown(KEY_E))
+			else if (IsKeyPressed(KEY_E))
 			{
-				divergence_vectors_x[i] += vel * delta_time;
-				divergence_vectors_x[i + grid_dimension + 1] += vel * delta_time;
+				divergence_vectors_x[i] += vel;
+				divergence_vectors_x[i + grid_dimension + 1] += vel;
 				//divergence_vectors_x[i + 2 * grid_dimension + 2] += vel * delta_time;
 				//divergence_vectors_x[i + 3 * grid_dimension + 3] += vel * delta_time;
 			}
-			if (IsKeyDown(KEY_S))
+			if (IsKeyPressed(KEY_S))
 			{
-				divergence_vectors_y[i] -= vel * delta_time;
-				divergence_vectors_y[i + grid_dimension] -= vel * delta_time;
+				divergence_vectors_y[i] -= vel;
+				divergence_vectors_y[i + grid_dimension] -= vel;
 			}
-			else if (IsKeyDown(KEY_W))
+			else if (IsKeyPressed(KEY_W))
 			{
-				divergence_vectors_y[i] += vel * delta_time;
-				divergence_vectors_y[i + grid_dimension] += vel * delta_time;
+				divergence_vectors_y[i] += vel;
+				divergence_vectors_y[i + grid_dimension] += vel;
 			}
 		}
 	}
@@ -225,7 +227,7 @@ public:
 
 		for (size_t i = 0; i < vector_num; i++)
 		{
-			divergence_vectors_y[i] += gravitational_acceleration * delta_time;
+			if(IndextoXY(i, grid_dimension).y < grid_dimension) divergence_vectors_y[i] += gravitational_acceleration * delta_time;
 		}
 	}
 
@@ -276,27 +278,31 @@ public:
 		for (size_t i = 0; i < vector_num; i++)
 		{
 			float x_component = divergence_vectors_x[i];
-			float y_component;
-			if (IndextoXY(i, grid_dimension + 1).x == grid_dimension)
+			float y_component = 0.0f;
+
+			int x = IndextoXY(i, grid_dimension + 1).x;
+			int y = IndextoXY(i, grid_dimension + 1).y;
+
+			if (x == grid_dimension)
 			{
-				y_component = (divergence_vectors_y[XYtoIndex(IndextoXY(i, grid_dimension + 1).x - 1, IndextoXY(i, grid_dimension + 1).y, grid_dimension)] +
-					divergence_vectors_y[XYtoIndex(IndextoXY(i, grid_dimension + 1).x - 1, IndextoXY(i, grid_dimension + 1).y + 1, grid_dimension)]) / 2;
+				y_component = (divergence_vectors_y[XYtoIndex(x - 1, y, grid_dimension)] +
+					divergence_vectors_y[XYtoIndex(x - 1, y + 1, grid_dimension)]) / 2.0f;
 			}
-			else if (IndextoXY(i, grid_dimension + 1).x == 0)
+			else if (x == 0)
 			{
-				y_component = (divergence_vectors_y[XYtoIndex(IndextoXY(i, grid_dimension + 1).x, IndextoXY(i, grid_dimension + 1).y, grid_dimension)] +
-					divergence_vectors_y[XYtoIndex(IndextoXY(i, grid_dimension + 1).x, IndextoXY(i, grid_dimension + 1).y + 1, grid_dimension)]) / 2;
+				y_component = (divergence_vectors_y[XYtoIndex(x, y, grid_dimension)] +
+					divergence_vectors_y[XYtoIndex(x, y + 1, grid_dimension)]) / 2.0f;
 			}
 			else
 			{
-				y_component = (divergence_vectors_y[XYtoIndex(IndextoXY(i, grid_dimension + 1).x, IndextoXY(i, grid_dimension + 1).y, grid_dimension)] +
-					divergence_vectors_y[XYtoIndex(IndextoXY(i, grid_dimension + 1).x, IndextoXY(i, grid_dimension + 1).y + 1, grid_dimension)] +
-					divergence_vectors_y[XYtoIndex(IndextoXY(i, grid_dimension + 1).x - 1, IndextoXY(i, grid_dimension + 1).y, grid_dimension)] +
-					divergence_vectors_y[XYtoIndex(IndextoXY(i, grid_dimension + 1).x - 1, IndextoXY(i, grid_dimension + 1).y + 1, grid_dimension)]) / 4;
+				y_component = (divergence_vectors_y[XYtoIndex(x - 1, y, grid_dimension)] +
+					divergence_vectors_y[XYtoIndex(x - 1, y + 1, grid_dimension)] +
+					divergence_vectors_y[XYtoIndex(x, y, grid_dimension)] +
+					divergence_vectors_y[XYtoIndex(x, y + 1, grid_dimension)]) / 4.0f;
 			}
 
-			float previous_position_x = IndextoXY(i, grid_dimension + 1).x - x_component * delta_time;
-			float previous_position_y = IndextoXY(i, grid_dimension + 1).y + 0.5f - y_component * delta_time;
+			float previous_position_x = x - x_component * delta_time;
+			float previous_position_y = y + 0.5f - y_component * delta_time;
 
 			divergence_vectors_x_previous[i] = find_velocity_x({ previous_position_x, previous_position_y });
 		}
@@ -309,26 +315,30 @@ public:
 		{
 			float y_component = divergence_vectors_y[i];
 			float x_component;
-			if (IndextoXY(i, grid_dimension).y == grid_dimension)
+
+			float x = IndextoXY(i, grid_dimension).x;
+			float y = IndextoXY(i, grid_dimension).y;
+
+			if (y == grid_dimension)
 			{
-				x_component = (divergence_vectors_x[XYtoIndex(IndextoXY(i, grid_dimension).x, IndextoXY(i, grid_dimension).y - 1, grid_dimension + 1)] +
-					divergence_vectors_x[XYtoIndex(IndextoXY(i, grid_dimension).x + 1, IndextoXY(i, grid_dimension).y - 1, grid_dimension + 1)]) / 2;
+				x_component = (divergence_vectors_x[XYtoIndex(x, y - 1, grid_dimension + 1)] +
+					divergence_vectors_x[XYtoIndex(x + 1, y - 1, grid_dimension + 1)]) / 2;
 			}
-			else if (IndextoXY(i, grid_dimension).y == 0)
+			else if (y == 0)
 			{
-				x_component = (divergence_vectors_x[XYtoIndex(IndextoXY(i, grid_dimension).x, IndextoXY(i, grid_dimension).y, grid_dimension + 1)] +
-					divergence_vectors_x[XYtoIndex(IndextoXY(i, grid_dimension).x + 1, IndextoXY(i, grid_dimension).y, grid_dimension + 1)]) / 2;
+				x_component = (divergence_vectors_x[XYtoIndex(x, y, grid_dimension + 1)] +
+					divergence_vectors_x[XYtoIndex(x + 1, y, grid_dimension + 1)]) / 2;
 			}
 			else
 			{
-				x_component = (divergence_vectors_x[XYtoIndex(IndextoXY(i, grid_dimension).x, IndextoXY(i, grid_dimension).y - 1, grid_dimension + 1)] +
-					divergence_vectors_x[XYtoIndex(IndextoXY(i, grid_dimension).x + 1, IndextoXY(i, grid_dimension).y - 1, grid_dimension + 1)] +
-					divergence_vectors_x[XYtoIndex(IndextoXY(i, grid_dimension).x, IndextoXY(i, grid_dimension).y, grid_dimension + 1)] +
-					divergence_vectors_x[XYtoIndex(IndextoXY(i, grid_dimension).x + 1, IndextoXY(i, grid_dimension).y, grid_dimension + 1)]) / 4;
+				x_component = (divergence_vectors_x[XYtoIndex(x, y - 1, grid_dimension + 1)] +
+					divergence_vectors_x[XYtoIndex(x + 1, y - 1, grid_dimension + 1)] +
+					divergence_vectors_x[XYtoIndex(x, y, grid_dimension + 1)] +
+					divergence_vectors_x[XYtoIndex(x + 1, y, grid_dimension + 1)]) / 4;
 			}
 
-			float previous_position_x = IndextoXY(i, grid_dimension).x + 0.5f - x_component * delta_time;
-			float previous_position_y = IndextoXY(i, grid_dimension).y - y_component * delta_time;
+			float previous_position_x = x + 0.5f - x_component * delta_time;
+			float previous_position_y = y - y_component * delta_time;
 
 			divergence_vectors_y_previous[i] = find_velocity_y({ previous_position_x, previous_position_y });
 		}
@@ -401,12 +411,12 @@ public:
 
 	void draw_interpolated_divergence_vectors()
 	{
-		const int vectors_per_side = 2;
-		const float thickness = 70.0f;
+		const unsigned int vectors_per_side = 3;
+		const float thickness = 150.0f;
+		const float length_multiplier = 2.0f;
 
 		const int N = grid_dimension;
 		const float offset = (WINDOW_WIDTH - WINDOW_HEIGHT) / 2;
-		const float length_multiplier = 40.0f;
 		const int vectors_per_cell = vectors_per_side * vectors_per_side;
 		const float cell_offset = cell_size / (vectors_per_side * 2);
 		const float m = 1.0f / (vectors_per_side * 2);
