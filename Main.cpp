@@ -36,11 +36,11 @@ int main(void)
         delta_time = GetFrameTime();
 
         //fluid_grid.add_gravity(delta_time);
-        fluid_grid.velocity_setter(delta_time);
+        fluid_grid.velocity_setter();
 
         //if (IsKeyDown(KEY_S))
         {
-            for (size_t i = 0; i < 30; i++)
+            for (size_t i = 0; i < fluid_grid.solver_iterations; i++)
             {
                 fluid_grid.solve_incompressibility();
             }
