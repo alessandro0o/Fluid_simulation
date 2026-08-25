@@ -38,12 +38,9 @@ int main(void)
         //fluid_grid.add_gravity(delta_time);
         fluid_grid.velocity_setter();
 
-        //if (IsKeyDown(KEY_S))
+        for (size_t i = 0; i < fluid_grid.solver_iterations; i++)
         {
-            for (size_t i = 0; i < fluid_grid.solver_iterations; i++)
-            {
-                fluid_grid.solve_incompressibility();
-            }
+            fluid_grid.solve_incompressibility();
         }
 
         fluid_grid.advect_velocites(delta_time);
