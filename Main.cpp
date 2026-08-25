@@ -37,6 +37,8 @@ int main(void)
 
         //fluid_grid.add_gravity(delta_time);
         fluid_grid.velocity_setter();
+        //fluid_grid.enable_blocked_cells();
+        fluid_grid.velocity_brush(delta_time);
 
         for (size_t i = 0; i < fluid_grid.solver_iterations; i++)
         {
