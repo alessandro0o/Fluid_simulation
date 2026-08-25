@@ -1,6 +1,6 @@
 #pragma once
 
-static constexpr int grid_dimension = 33;
+static constexpr int grid_dimension = 45;
 static constexpr int grid_dimension_sqr = grid_dimension * grid_dimension;
 static constexpr int vector_num = grid_dimension * (grid_dimension + 1);
 static constexpr float cell_size = WINDOW_HEIGHT / grid_dimension;
@@ -28,6 +28,7 @@ struct Fluid_cell
 {
 	float divergence = 0.0f;
 	float pressure = 0.0f;
+	bool is_blocked = false;
 	Vector2 velocity_vector = { 0,0 };
 };
 
@@ -40,6 +41,7 @@ private:
 	std::vector<float> divergence_vectors_y;
 	std::vector<float> divergence_vectors_x_previous;
 	std::vector<float> divergence_vectors_y_previous;
+	Vector2 mouse_pos_previous = { 0.0f, 0.0f };
 
 
 	float find_velocity_x(Vector2 pos)
@@ -184,6 +186,7 @@ public:
 		divergence_vectors_x_previous = std::vector<float>(vector_num, 0.0f);
 		divergence_vectors_y_previous = std::vector<float>(vector_num, 0.0f);
 		init_cell_grid_texture();
+		//blocked_cells_setter();
 	};
 	~Fluid_grid()
 	{
@@ -192,41 +195,88 @@ public:
 
 	const unsigned int solver_iterations = 30;
 
+	void blocked_cells_setter()
+	{
+		fluid_cell_grid[XYtoIndex(grid_dimension / 2, grid_dimension / 2, grid_dimension)].is_blocked = true;
+		fluid_cell_grid[XYtoIndex(grid_dimension / 2, grid_dimension / 2 + 1, grid_dimension)].is_blocked = true;
+		fluid_cell_grid[XYtoIndex(grid_dimension / 2, grid_dimension / 2 + 2, grid_dimension)].is_blocked = true;
+		fluid_cell_grid[XYtoIndex(grid_dimension / 2, grid_dimension / 2 + 3, grid_dimension)].is_blocked = true;
+	}
+
 	void velocity_setter()
 	{
 		const float vel = 30.0f;
 
-		if (IsKeyDown(KEY_W))
+		if (IsKeyDown(KEY_W) || IsKeyDown(KEY_E))
 		{
 			divergence_vectors_y[XYtoIndex(grid_dimension / 2, grid_dimension, grid_dimension)] = -vel;
 		}
-		if (IsKeyDown(KEY_S))
+		if (IsKeyDown(KEY_S) || IsKeyDown(KEY_E))
 		{
 			divergence_vectors_y[XYtoIndex(grid_dimension / 2, 0, grid_dimension)] = vel;
 		}
-		if (IsKeyDown(KEY_D))
+		if (IsKeyDown(KEY_D) || IsKeyDown(KEY_E))
 		{
 			divergence_vectors_x[XYtoIndex(0, grid_dimension / 2, grid_dimension + 1)] = vel;
 		}
-		if (IsKeyDown(KEY_A))
+		if (IsKeyDown(KEY_A) || IsKeyDown(KEY_E))
 		{
 			divergence_vectors_x[XYtoIndex(grid_dimension, grid_dimension / 2, grid_dimension + 1)] = -vel;
 		}
-		if (IsKeyDown(KEY_E))
+		if (IsKeyDown(KEY_R))
 		{
-			divergence_vectors_y[XYtoIndex(grid_dimension / 2, grid_dimension, grid_dimension)] = -vel;
-			divergence_vectors_y[XYtoIndex(grid_dimension / 2, 0, grid_dimension)] = vel;
-			divergence_vectors_x[XYtoIndex(0, grid_dimension / 2, grid_dimension + 1)] = vel;
-			divergence_vectors_x[XYtoIndex(grid_dimension, grid_dimension / 2, grid_dimension + 1)] = -vel;
+			for (size_t i = 0; i < vector_num; i++)
+			{
+				divergence_vectors_x[i] = 0.0f;
+				divergence_vectors_x_previous[i] = 0.0f;
+				divergence_vectors_y[i] = 0.0f;
+				divergence_vectors_y_previous[i] = 0.0f;
+			}
 		}
 	}
 
-	void velocity_brush()
+	void velocity_brush(float delta_time)
 	{
-		const float effect_radius = 100.0f;
+		const float effect_radius = 50.0f;
+		const float effect_strength = 0.005f;
 
-		Vector2 mouse_pos = GetMousePosition();
+		const float offset = (WINDOW_WIDTH - WINDOW_HEIGHT) / 2.0f;
+		Vector2 mouse_pos_current = GetMousePosition();
+		
+		float mouse_vel_x = (mouse_pos_current.x - mouse_pos_previous.x) / delta_time;
+		float mouse_vel_y = (mouse_pos_current.y - mouse_pos_previous.y) / delta_time;
 
+		for (size_t i = 0; i < vector_num; i++)
+		{
+			float x_1 = IndextoXY(i, grid_dimension + 1).x;
+			float y_1 = IndextoXY(i, grid_dimension + 1).y;
+
+			float x_2 = IndextoXY(i, grid_dimension).x;
+			float y_2 = IndextoXY(i, grid_dimension).y;
+
+			if (CheckCollisionPointCircle({x_1 * cell_size + offset, y_1 * cell_size + cell_size / 2.0f}, mouse_pos_current, effect_radius) &&
+				x_1 > 0 &&
+				x_1 < grid_dimension &&
+				y_1 > 0 &&
+				y_1 < grid_dimension - 1
+				&& IsMouseButtonDown(MOUSE_BUTTON_LEFT))
+			{
+				divergence_vectors_x[i] += mouse_vel_x * effect_strength;
+			}
+
+			if (CheckCollisionPointCircle({ x_2 * cell_size + offset + cell_size / 2.0f, y_2 * cell_size }, mouse_pos_current, effect_radius) &&
+				x_2 > 0 &&
+				x_2 < grid_dimension - 1 &&
+				y_2 > 0 &&
+				y_2 < grid_dimension
+				&& IsMouseButtonDown(MOUSE_BUTTON_LEFT))
+			{
+				divergence_vectors_y[i] += mouse_vel_y * effect_strength;
+			}
+		}
+
+
+		mouse_pos_previous = mouse_pos_current;
 	}
 
 	void add_gravity(float delta_time)
@@ -238,6 +288,100 @@ public:
 			if(IndextoXY(i, grid_dimension).y < grid_dimension) divergence_vectors_y[i] += gravitational_acceleration * delta_time;
 		}
 	}
+
+	void enable_blocked_cells()
+	{
+		const int N = grid_dimension;
+
+		for (size_t i = 0; i < grid_dimension_sqr; i++)
+		{
+			const int x = IndextoXY(i, grid_dimension).x;
+			const int y = IndextoXY(i, grid_dimension).y;
+
+			float& div_up = divergence_vectors_y[XYtoIndex(x, y, N)];
+			float& div_down = divergence_vectors_y[XYtoIndex(x, y + 1, N)];
+			float& div_left = divergence_vectors_x[XYtoIndex(x, y, N + 1)];
+			float& div_right = divergence_vectors_x[XYtoIndex(x + 1, y, N + 1)];
+
+			if (fluid_cell_grid[i].is_blocked)
+			{
+				div_up = 0.0f;
+				div_down = 0.0f;
+				div_left = 0.0f;
+				div_right = 0.0f;
+			}
+		}
+	}
+
+	//void solve_incompressibility()
+	//{
+	//	constexpr float overrelaxation_parameter = 1.7f;
+
+	//	const int N = grid_dimension;
+
+	//	for (size_t i = 0; i < grid_dimension_sqr; i++)
+	//	{
+	//		const int x = IndextoXY(i, grid_dimension).x;
+	//		const int y = IndextoXY(i, grid_dimension).y;
+
+	//		float& div_up = divergence_vectors_y[XYtoIndex(x, y, N)];
+	//		float& div_down = divergence_vectors_y[XYtoIndex(x, y + 1, N)];
+	//		float& div_left = divergence_vectors_x[XYtoIndex(x, y, N + 1)];
+	//		float& div_right = divergence_vectors_x[XYtoIndex(x + 1, y, N + 1)];
+
+	//		fluid_cell_grid[i].divergence = -(div_left - div_right + div_up - div_down) * overrelaxation_parameter;
+
+	//		bool is_free_up = true;
+	//		bool is_free_down = true;
+	//		bool is_free_left = true;
+	//		bool is_free_right = true;
+
+	//		if (x > 0)
+	//		{
+	//			if (fluid_cell_grid[XYtoIndex(x - 1, y, grid_dimension)].is_blocked == true)
+	//			{
+	//				is_free_left = false;
+	//			}
+	//		}
+	//		if (x < N - 1)
+	//		{
+	//			if (fluid_cell_grid[XYtoIndex(x + 1, y, grid_dimension)].is_blocked == true)
+	//			{
+	//				is_free_right = false;
+	//			}
+	//		}
+	//		if (y > 0)
+	//		{
+	//			if (fluid_cell_grid[XYtoIndex(x, y - 1, grid_dimension)].is_blocked == true)
+	//			{
+	//				is_free_up = false;
+	//			}
+	//		}
+	//		if (y < N - 1)
+	//		{
+	//			if (fluid_cell_grid[XYtoIndex(x, y + 1, grid_dimension)].is_blocked == true)
+	//			{
+	//				is_free_down = false;
+	//			}
+	//		}
+
+	//		int divisor = 4;
+
+	//		if (x == 0	||		!is_free_left)		divisor--;
+	//		if (x == N - 1 ||	!is_free_right)		divisor--;
+	//		if (y == 0 ||		!is_free_up)		divisor--;
+	//		if (y == N - 1 ||	!is_free_down)		divisor--;
+
+	//		if (divisor == 0) divisor = 1;
+
+	//		float d = fluid_cell_grid[i].divergence / divisor;
+
+	//		if (x > 0 && is_free_left) div_left += d;
+	//		if (x < N - 1 && is_free_right) div_right -= d;
+	//		if (y > 0 && is_free_up) div_up += d;
+	//		if (y < N - 1 && is_free_down) div_down -= d;
+	//	}
+	//}
 
 	void solve_incompressibility()
 	{
@@ -259,23 +403,19 @@ public:
 
 			int divisor = 4;
 
-			if (x == 0 || x == N - 1) divisor--;
+			if (x == 0)		divisor--;
+			if (x == N - 1)	divisor--;
+			if (y == 0)		divisor--;
+			if (y == N - 1)	divisor--;
 
-			if (y == 0 || y == N - 1) divisor--;
+			if (divisor == 0) divisor = 1;
 
 			float d = fluid_cell_grid[i].divergence / divisor;
 
-			if (x > 0)
-				div_left += d;
-
-			if (x < N - 1)
-				div_right -= d;
-
-			if (y > 0)
-				div_up += d;
-
-			if (y < N - 1)
-				div_down -= d;
+			if (x > 0)		div_left	+= d;
+			if (x < N - 1)	div_right	-= d;
+			if (y > 0)		div_up		+= d;
+			if (y < N - 1)	div_down	-= d;
 		}
 	}
 
@@ -366,7 +506,8 @@ public:
 		for (size_t i = 0; i < grid_dimension_sqr; i++)
 		{
 			//cell_grid_pixels[i] = getColor(fluid_cell_grid[i].divergence);
-			cell_grid_pixels[i] = { 33, 46, 82, 255 };
+			if (!fluid_cell_grid[i].is_blocked) cell_grid_pixels[i] = { 33, 46, 82, 255 };
+			else cell_grid_pixels[i] = { 0, 0, 0, 255 };
 		}
 
 		UpdateTexture(
@@ -403,7 +544,7 @@ public:
 	void draw_divergence_vectors()
 	{
 		const float offset = (WINDOW_WIDTH - WINDOW_HEIGHT) / 2;
-		const float length_multiplier = 1.0f;
+		const float length_multiplier = 2.0f;
 
 		for (size_t i = 0; i < vector_num; i++)
 		{
@@ -419,12 +560,12 @@ public:
 
 	void draw_interpolated_divergence_vectors()
 	{
-		const unsigned int vectors_per_side = 3;
+		const unsigned int vectors_per_side = 2;
 		const float thickness = 125.0f;
 		const float length_multiplier = 5.0f;
 
 		const int N = grid_dimension;
-		const float offset = (WINDOW_WIDTH - WINDOW_HEIGHT) / 2;
+		const float offset = (WINDOW_WIDTH - WINDOW_HEIGHT) / 2.0f;
 		const int vectors_per_cell = vectors_per_side * vectors_per_side;
 		const float cell_offset = cell_size / (vectors_per_side * 2);
 		const float m = 1.0f / (vectors_per_side * 2);
