@@ -1,6 +1,6 @@
 #pragma once
 
-static constexpr int grid_dimension = 32;
+static constexpr int grid_dimension = 33;
 static constexpr int grid_dimension_sqr = grid_dimension * grid_dimension;
 static constexpr int vector_num = grid_dimension * (grid_dimension + 1);
 static constexpr float cell_size = WINDOW_HEIGHT / grid_dimension;
@@ -46,12 +46,12 @@ private:
 	{
 		float vel_x = 0.0f;
 
-		if (pos.x <= 0.0f || pos.x >= grid_dimension * cell_size || pos.y <= 0.0f || pos.y >= grid_dimension * cell_size) return 0.0f;
+		if (pos.x <= 0.0f || pos.x >= grid_dimension || pos.y <= 0.0f || pos.y >= grid_dimension) return vel_x;
 
 		int x_index = std::floor(pos.x);
 		int y_index = std::floor(pos.y - 0.5f);
 
-		if (pos.y <= 0.5f)
+		if (pos.y < 0.5f)
 		{
 			y_index = 0;
 		}
@@ -62,34 +62,40 @@ private:
 		float top_vel = 0.0f;
 		float bottom_vel = 0.0f;
 
-		if (x_index < grid_dimension)
+		top_vel += divergence_vectors_x[XYtoIndex(x_index, y_index, grid_dimension + 1)] * (1.0f - x_offset);
+		top_vel += divergence_vectors_x[XYtoIndex(x_index + 1, y_index, grid_dimension + 1)] * (x_offset);
+
+		if (pos.y < 0.5f)
 		{
-			top_vel += divergence_vectors_x[XYtoIndex(x_index, y_index, grid_dimension + 1)] * (1.0f - x_offset);
-			top_vel += divergence_vectors_x[XYtoIndex(x_index + 1, y_index, grid_dimension + 1)] * (x_offset);
+			vel_x += top_vel;
+			return vel_x * (pos.y + 0.5f);
 		}
 
-		if (pos.y < grid_dimension - 0.5f && pos.y > 0.5f && x_index < grid_dimension)
+		if (pos.y < grid_dimension - 0.5f)
 		{
 			bottom_vel += divergence_vectors_x[XYtoIndex(x_index, y_index + 1, grid_dimension + 1)] * (1.0f - x_offset);
 			bottom_vel += divergence_vectors_x[XYtoIndex(x_index + 1, y_index + 1, grid_dimension + 1)] * (x_offset);
+
+			vel_x += top_vel * (1.0f - y_offset);
+			vel_x += bottom_vel * (y_offset);
+
+			return vel_x;
 		}
 
-		vel_x += top_vel * (1.0f - y_offset);
-		vel_x += bottom_vel * (y_offset);
-
-		return vel_x;
+		vel_x += top_vel;
+		return vel_x * (1.0f - y_offset);
 	}
 
 	float find_velocity_y(Vector2 pos)
 	{
 		float vel_y = 0.0f;
 
-		if (pos.x <= 0 || pos.x >= grid_dimension * cell_size || pos.y <= 0 || pos.y >= grid_dimension * cell_size) return 0.0f;
+		if (pos.x <= 0.0f || pos.x >= grid_dimension || pos.y <= 0.0f || pos.y >= grid_dimension) return 0.0f;
 
 		int x_index = std::floor(pos.x - 0.5f);
 		int y_index = std::floor(pos.y);
 
-		if (pos.x <= 0.5f)
+		if (pos.x < 0.5f)
 		{
 			x_index = 0;
 		}
@@ -100,22 +106,28 @@ private:
 		float left_vel = 0.0f;
 		float right_vel = 0.0f;
 
-		if (y_index < grid_dimension)
+		left_vel += divergence_vectors_y[XYtoIndex(x_index, y_index, grid_dimension)] * (1.0f - y_offset);
+		left_vel += divergence_vectors_y[XYtoIndex(x_index, y_index + 1, grid_dimension)] * (y_offset);
+
+		if (pos.x < 0.5f)
 		{
-			left_vel += divergence_vectors_y[XYtoIndex(x_index, y_index, grid_dimension)] * (1.0f - y_offset);
-			left_vel += divergence_vectors_y[XYtoIndex(x_index, y_index + 1, grid_dimension)] * (y_offset);
+			vel_y += left_vel;
+			return vel_y * (pos.x + 0.5f);
 		}
 
-		if (pos.x < grid_dimension - 0.5f && pos.x > 0.5f && y_index < grid_dimension)
+		if (pos.x < grid_dimension - 0.5f)
 		{
 			right_vel += divergence_vectors_y[XYtoIndex(x_index + 1, y_index, grid_dimension)] * (1.0f - y_offset);
 			right_vel += divergence_vectors_y[XYtoIndex(x_index + 1, y_index + 1, grid_dimension)] * (y_offset);
+
+			vel_y += left_vel * (1.0f - x_offset);
+			vel_y += right_vel * (x_offset);
+
+			return vel_y;
 		}
 
-		vel_y += left_vel * (1.0f - x_offset);
-		vel_y += right_vel * (x_offset);
-
-		return vel_y;
+		vel_y += left_vel;
+		return vel_y * (1.0f - x_offset);
 	}
 
 	void random_divergence_vectors_init()
@@ -182,34 +194,30 @@ public:
 
 	void velocity_setter()
 	{
-		const float vel = 20.0f;
+		const float vel = 30.0f;
 
-		for (size_t i = grid_dimension_sqr / 2 - grid_dimension / 3; i < grid_dimension_sqr / 2 - grid_dimension / 5 + grid_dimension / 2; i++)
+		if (IsKeyDown(KEY_W))
 		{
-			if (IsKeyPressed(KEY_Q))
-			{
-				divergence_vectors_x[i] -= vel;
-				divergence_vectors_x[i + grid_dimension + 1] -= vel;
-				//divergence_vectors_x[i + 2 * grid_dimension + 2] -= vel * delta_time;
-				//divergence_vectors_x[i + 3 * grid_dimension + 3] -= vel * delta_time;
-			}
-			else if (IsKeyPressed(KEY_E))
-			{
-				divergence_vectors_x[i] += vel;
-				divergence_vectors_x[i + grid_dimension + 1] += vel;
-				//divergence_vectors_x[i + 2 * grid_dimension + 2] += vel * delta_time;
-				//divergence_vectors_x[i + 3 * grid_dimension + 3] += vel * delta_time;
-			}
-			if (IsKeyPressed(KEY_S))
-			{
-				divergence_vectors_y[i] -= vel;
-				divergence_vectors_y[i + grid_dimension] -= vel;
-			}
-			else if (IsKeyPressed(KEY_W))
-			{
-				divergence_vectors_y[i] += vel;
-				divergence_vectors_y[i + grid_dimension] += vel;
-			}
+			divergence_vectors_y[XYtoIndex(grid_dimension / 2, grid_dimension, grid_dimension)] = -vel;
+		}
+		if (IsKeyDown(KEY_S))
+		{
+			divergence_vectors_y[XYtoIndex(grid_dimension / 2, 0, grid_dimension)] = vel;
+		}
+		if (IsKeyDown(KEY_D))
+		{
+			divergence_vectors_x[XYtoIndex(0, grid_dimension / 2, grid_dimension + 1)] = vel;
+		}
+		if (IsKeyDown(KEY_A))
+		{
+			divergence_vectors_x[XYtoIndex(grid_dimension, grid_dimension / 2, grid_dimension + 1)] = -vel;
+		}
+		if (IsKeyDown(KEY_E))
+		{
+			divergence_vectors_y[XYtoIndex(grid_dimension / 2, grid_dimension, grid_dimension)] = -vel;
+			divergence_vectors_y[XYtoIndex(grid_dimension / 2, 0, grid_dimension)] = vel;
+			divergence_vectors_x[XYtoIndex(0, grid_dimension / 2, grid_dimension + 1)] = vel;
+			divergence_vectors_x[XYtoIndex(grid_dimension, grid_dimension / 2, grid_dimension + 1)] = -vel;
 		}
 	}
 
@@ -239,8 +247,8 @@ public:
 
 		for (size_t i = 0; i < grid_dimension_sqr; i++)
 		{
-			const int x = i % N;
-			const int y = i / N;
+			const int x = IndextoXY(i, grid_dimension).x;
+			const int y = IndextoXY(i, grid_dimension).y;
 
 			float& div_up = divergence_vectors_y[XYtoIndex(x, y, N)];
 			float& div_down = divergence_vectors_y[XYtoIndex(x, y + 1, N)];
@@ -395,7 +403,7 @@ public:
 	void draw_divergence_vectors()
 	{
 		const float offset = (WINDOW_WIDTH - WINDOW_HEIGHT) / 2;
-		const float length_multiplier = 50.0f;
+		const float length_multiplier = 1.0f;
 
 		for (size_t i = 0; i < vector_num; i++)
 		{
@@ -412,8 +420,8 @@ public:
 	void draw_interpolated_divergence_vectors()
 	{
 		const unsigned int vectors_per_side = 3;
-		const float thickness = 150.0f;
-		const float length_multiplier = 2.0f;
+		const float thickness = 125.0f;
+		const float length_multiplier = 5.0f;
 
 		const int N = grid_dimension;
 		const float offset = (WINDOW_WIDTH - WINDOW_HEIGHT) / 2;
