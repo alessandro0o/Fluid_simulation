@@ -1,6 +1,6 @@
 #pragma once
 
-static constexpr int grid_dimension = 35;
+static constexpr int grid_dimension = 65;
 static constexpr int grid_dimension_sqr = grid_dimension * grid_dimension;
 static constexpr int vector_num = grid_dimension * (grid_dimension + 1);
 static constexpr float cell_size = WINDOW_HEIGHT / grid_dimension;
@@ -208,15 +208,11 @@ public:
 		}
 		if (IsKeyDown(KEY_D) || IsKeyDown(KEY_E))
 		{
-			divergence_vectors_x[XYtoIndex(0, grid_dimension / 2, grid_dimension + 1)] = vel;
-			//divergence_vectors_x[XYtoIndex(0, grid_dimension / 2 + 1, grid_dimension + 1)] = vel;
-			//divergence_vectors_x[XYtoIndex(0, grid_dimension / 2 - 1, grid_dimension + 1)] = vel;
-			//divergence_vectors_x[XYtoIndex(0, grid_dimension / 2 + 2, grid_dimension + 1)] = vel;
-			//divergence_vectors_x[XYtoIndex(0, grid_dimension / 2 - 2, grid_dimension + 1)] = vel;
-			//divergence_vectors_x[XYtoIndex(0, grid_dimension / 2 + 3, grid_dimension + 1)] = vel;
-			//divergence_vectors_x[XYtoIndex(0, grid_dimension / 2 - 3, grid_dimension + 1)] = vel;
-			//divergence_vectors_x[XYtoIndex(0, grid_dimension / 2 + 4, grid_dimension + 1)] = vel;
-			//divergence_vectors_x[XYtoIndex(0, grid_dimension / 2 - 4, grid_dimension + 1)] = vel;
+			//divergence_vectors_x[XYtoIndex(0, grid_dimension / 2, grid_dimension + 1)] = vel;
+			for (size_t i = 0; i < grid_dimension; i++)
+			{
+				divergence_vectors_x[XYtoIndex(0, i, grid_dimension + 1)] = vel;
+			}
 		}
 		if (IsKeyDown(KEY_A) || IsKeyDown(KEY_E))
 		{
@@ -237,7 +233,7 @@ public:
 	void velocity_brush(float delta_time)
 	{
 		const float effect_radius = 75.0f;
-		const float effect_strength = 0.005f;
+		const float effect_strength = 0.008f;
 
 		const float offset = (WINDOW_WIDTH - WINDOW_HEIGHT) / 2.0f;
 		Vector2 mouse_pos_current = GetMousePosition();
@@ -387,7 +383,8 @@ public:
 			int divisor = 4;
 
 			if (x == 0	||		!is_free_left)		divisor--;
-			if (x == N - 1 ||	!is_free_right)		divisor--;
+			//if (x == N - 1 ||	!is_free_right)		divisor--;
+			if (!is_free_right)		divisor--;
 			if (y == 0 ||		!is_free_up)		divisor--;
 			if (y == N - 1 ||	!is_free_down)		divisor--;
 
@@ -396,7 +393,8 @@ public:
 			float d = fluid_cell_grid[i].divergence / divisor;
 
 			if (x > 0 && is_free_left) div_left += d;
-			if (x < N - 1 && is_free_right) div_right -= d;
+			//if (x < N - 1 && is_free_right) div_right -= d;
+			if (is_free_right) div_right -= d;
 			if (y > 0 && is_free_up) div_up += d;
 			if (y < N - 1 && is_free_down) div_down -= d;
 		}
@@ -489,19 +487,19 @@ public:
 			if (y == grid_dimension)
 			{
 				x_component = (divergence_vectors_x[XYtoIndex(x, y - 1, grid_dimension + 1)] +
-					divergence_vectors_x[XYtoIndex(x + 1, y - 1, grid_dimension + 1)]) / 2;
+					divergence_vectors_x[XYtoIndex(x + 1, y - 1, grid_dimension + 1)]) / 2.0f;
 			}
 			else if (y == 0)
 			{
 				x_component = (divergence_vectors_x[XYtoIndex(x, y, grid_dimension + 1)] +
-					divergence_vectors_x[XYtoIndex(x + 1, y, grid_dimension + 1)]) / 2;
+					divergence_vectors_x[XYtoIndex(x + 1, y, grid_dimension + 1)]) / 2.0f;
 			}
 			else
 			{
 				x_component = (divergence_vectors_x[XYtoIndex(x, y - 1, grid_dimension + 1)] +
 					divergence_vectors_x[XYtoIndex(x + 1, y - 1, grid_dimension + 1)] +
 					divergence_vectors_x[XYtoIndex(x, y, grid_dimension + 1)] +
-					divergence_vectors_x[XYtoIndex(x + 1, y, grid_dimension + 1)]) / 4;
+					divergence_vectors_x[XYtoIndex(x + 1, y, grid_dimension + 1)]) / 4.0f;
 			}
 
 			float previous_position_x = x + 0.5f - x_component * delta_time;
@@ -581,7 +579,7 @@ public:
 	{
 		const unsigned int vectors_per_side = 2;
 		const float thickness = 150.0f;
-		const float length_multiplier = 2.0f;
+		const float length_multiplier = 0.5f;
 
 		const int N = grid_dimension;
 		const float offset = (WINDOW_WIDTH - WINDOW_HEIGHT) / 2.0f;
