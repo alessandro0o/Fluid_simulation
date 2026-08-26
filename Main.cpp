@@ -5,7 +5,7 @@
 #include <ctime>
 #include "raylib.h"
 
-static constexpr int FPS = 60;
+static constexpr unsigned int FPS = 60;
 static constexpr float WINDOW_WIDTH = 2560.0f;
 static constexpr float WINDOW_HEIGHT = 1440.0f;
 
@@ -37,8 +37,9 @@ int main(void)
 
         //fluid_grid.add_gravity(delta_time);
         fluid_grid.velocity_setter();
-        //fluid_grid.enable_blocked_cells();
         fluid_grid.velocity_brush(delta_time);
+        fluid_grid.blocked_cells_brush();
+        fluid_grid.enable_blocked_cells();
 
         for (size_t i = 0; i < fluid_grid.solver_iterations; i++)
         {
