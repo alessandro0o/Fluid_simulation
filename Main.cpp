@@ -1,3 +1,10 @@
+/*
+    TO DO
+
+    find_smoke_density function
+
+*/
+
 #include <iostream>
 #include <cmath>
 #include <algorithm>
@@ -36,17 +43,13 @@ int main(void)
         delta_time = GetFrameTime();
 
         //fluid_grid.add_gravity(delta_time);
+
         fluid_grid.velocity_setter();
         fluid_grid.velocity_brush(delta_time);
         fluid_grid.blocked_cells_brush();
-        fluid_grid.enable_blocked_cells();
+        fluid_grid.smoke_setter();
 
-        for (size_t i = 0; i < fluid_grid.solver_iterations; i++)
-        {
-            fluid_grid.solve_incompressibility();
-        }
-
-        fluid_grid.advect_velocites(delta_time);
+        fluid_grid.solve_incompressibility();
 
         //  rendering
 
@@ -62,6 +65,9 @@ int main(void)
             DrawText(TextFormat("FPS %i", GetFPS()), 10, 10, 30, BLUE);
         }
         EndDrawing();
+
+        fluid_grid.advect_velocites(delta_time);
+        fluid_grid.advect_smoke(delta_time);
     }
 
     CloseWindow();
