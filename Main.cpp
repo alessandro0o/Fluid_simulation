@@ -1,7 +1,8 @@
 /*
     TO DO
 
-    find_smoke_density function
+    fix find_smoke_density function
+    implement keybind to toggle smoke and velocity vectors
 
 */
 
@@ -47,7 +48,7 @@ int main(void)
         fluid_grid.velocity_setter();
         fluid_grid.velocity_brush(delta_time);
         fluid_grid.blocked_cells_brush();
-        fluid_grid.smoke_setter();
+        //fluid_grid.smoke_setter();
 
         fluid_grid.solve_incompressibility();
 
@@ -55,7 +56,7 @@ int main(void)
 
         BeginDrawing();
         {
-            ClearBackground(DARKGRAY);
+            ClearBackground(BLACK);
 
             fluid_grid.draw_cell_grid();
             fluid_grid.draw_interpolated_divergence_vectors();
@@ -67,7 +68,7 @@ int main(void)
         EndDrawing();
 
         fluid_grid.advect_velocites(delta_time);
-        fluid_grid.advect_smoke(delta_time);
+        //fluid_grid.advect_smoke(delta_time);
     }
 
     CloseWindow();
