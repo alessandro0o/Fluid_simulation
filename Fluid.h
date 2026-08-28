@@ -28,8 +28,10 @@ struct Fluid_cell
 {
 	float divergence = 0.0f;
 	float pressure = 0.0f;
+	Vector2 velocity_vector = { 0.0f, 0.0f };
+	float smoke_density = 0.0f;
+	float smoke_density_previous = 0.0f;
 	bool is_blocked = false;
-	Vector2 velocity_vector = { 0,0 };
 };
 
 class Fluid_grid
@@ -41,14 +43,13 @@ private:
 	std::vector<float> divergence_vectors_y;
 	std::vector<float> divergence_vectors_x_previous;
 	std::vector<float> divergence_vectors_y_previous;
-	Vector2 mouse_pos_previous = { 0.0f, 0.0f };
 
+	Vector2 mouse_pos_previous = { 0.0f, 0.0f };
+	const unsigned int solver_iterations = 40;
 
 	float find_velocity_x(Vector2 pos)
 	{
 		float vel_x = 0.0f;
-
-		if (pos.x <= 0.0f || pos.x >= grid_dimension || pos.y <= 0.0f || pos.y >= grid_dimension) return vel_x;
 
 		int x_index = std::floor(pos.x);
 		int y_index = std::floor(pos.y - 0.5f);
@@ -92,8 +93,6 @@ private:
 	{
 		float vel_y = 0.0f;
 
-		if (pos.x <= 0.0f || pos.x >= grid_dimension || pos.y <= 0.0f || pos.y >= grid_dimension) return 0.0f;
-
 		int x_index = std::floor(pos.x - 0.5f);
 		int y_index = std::floor(pos.y);
 
@@ -132,21 +131,20 @@ private:
 		return vel_y * (1.0f - x_offset);
 	}
 
-	void random_divergence_vectors_init()
+	float find_smoke_density(Vector2 pos)
 	{
-		SetRandomSeed(time(NULL));
-		for (size_t i = 0; i < vector_num; i++)
-		{
-			if (IndextoXY(i, grid_dimension + 1).x > 0 && IndextoXY(i, grid_dimension + 1).x < grid_dimension)
-			{
-				divergence_vectors_x[i] = (float)(GetRandomValue(-100, 100)) / 100;
-			}
+		float smoke_density = 0.0f;
+		if (pos.x <= 0.0f || pos.x >= grid_dimension || pos.y <= 0.0f || pos.y >= grid_dimension) return 0.0f;
 
-			if (IndextoXY(i, grid_dimension).y > 0 && IndextoXY(i, grid_dimension).y < grid_dimension)
-			{
-				divergence_vectors_y[i] = (float)(GetRandomValue(-100, 100)) / 100;
-			}
-		}
+		int x_index = std::floor(pos.x);
+		int y_index = std::floor(pos.y);
+
+		float x_offset = pos.x - x_index;
+		float y_offset = pos.y - y_index;
+
+
+
+		return smoke_density;
 	}
 
 	Texture2D cell_grid_texture;
@@ -192,8 +190,6 @@ public:
 		unload_cell_grid_texture();
 	};
 
-	const unsigned int solver_iterations = 30;
-
 	void velocity_setter()
 	{
 		const float vel = 50.0f;
@@ -228,6 +224,11 @@ public:
 				divergence_vectors_y_previous[i] = 0.0f;
 			}
 		}
+	}
+
+	void smoke_setter()
+	{
+		fluid_cell_grid[XYtoIndex(0, grid_dimension / 2, grid_dimension)].smoke_density = 1.0f;
 	}
 
 	void velocity_brush(float delta_time)
@@ -276,6 +277,7 @@ public:
 	{
 		const float offset = (WINDOW_WIDTH - WINDOW_HEIGHT) / 2.0f;
 		Vector2 mouse_pos = GetMousePosition();
+		const int N = grid_dimension;
 
 		for (size_t i = 0; i < grid_dimension_sqr; i++)
 		{
@@ -291,27 +293,6 @@ public:
 				else fluid_cell_grid[i].is_blocked = true;
 
 			}
-		}
-	}
-
-	void add_gravity(float delta_time)
-	{
-		const float gravitational_acceleration = 10.0f;
-
-		for (size_t i = 0; i < vector_num; i++)
-		{
-			if(IndextoXY(i, grid_dimension).y < grid_dimension) divergence_vectors_y[i] += gravitational_acceleration * delta_time;
-		}
-	}
-
-	void enable_blocked_cells()
-	{
-		const int N = grid_dimension;
-
-		for (size_t i = 0; i < grid_dimension_sqr; i++)
-		{
-			const int x = IndextoXY(i, grid_dimension).x;
-			const int y = IndextoXY(i, grid_dimension).y;
 
 			float& div_up = divergence_vectors_y[XYtoIndex(x, y, N)];
 			float& div_down = divergence_vectors_y[XYtoIndex(x, y + 1, N)];
@@ -328,75 +309,91 @@ public:
 		}
 	}
 
+	void add_gravity(float delta_time)
+	{
+		const float gravitational_acceleration = 10.0f;
+
+		for (size_t i = 0; i < vector_num; i++)
+		{
+			if(IndextoXY(i, grid_dimension).y < grid_dimension) divergence_vectors_y[i] += gravitational_acceleration * delta_time;
+		}
+	}
+
 	void solve_incompressibility()
 	{
 		constexpr float overrelaxation_parameter = 1.7f;
 
 		const int N = grid_dimension;
 
-		for (size_t i = 0; i < grid_dimension_sqr; i++)
+		for (size_t k = 0; k < solver_iterations; k++)
 		{
-			const int x = IndextoXY(i, grid_dimension).x;
-			const int y = IndextoXY(i, grid_dimension).y;
-
-			float& div_up = divergence_vectors_y[XYtoIndex(x, y, N)];
-			float& div_down = divergence_vectors_y[XYtoIndex(x, y + 1, N)];
-			float& div_left = divergence_vectors_x[XYtoIndex(x, y, N + 1)];
-			float& div_right = divergence_vectors_x[XYtoIndex(x + 1, y, N + 1)];
-
-			fluid_cell_grid[i].divergence = -(div_left - div_right + div_up - div_down) * overrelaxation_parameter;
-
-			bool is_free_up = true;
-			bool is_free_down = true;
-			bool is_free_left = true;
-			bool is_free_right = true;
-
-			if (x > 0)
+			for (size_t i = 0; i < grid_dimension_sqr; i++)
 			{
-				if (fluid_cell_grid[XYtoIndex(x - 1, y, grid_dimension)].is_blocked == true)
+				if (fluid_cell_grid[i].is_blocked) continue;
+
+				const int x = IndextoXY(i, grid_dimension).x;
+				const int y = IndextoXY(i, grid_dimension).y;
+
+				float& div_up = divergence_vectors_y[XYtoIndex(x, y, N)];
+				float& div_down = divergence_vectors_y[XYtoIndex(x, y + 1, N)];
+				float& div_left = divergence_vectors_x[XYtoIndex(x, y, N + 1)];
+				float& div_right = divergence_vectors_x[XYtoIndex(x + 1, y, N + 1)];
+
+				fluid_cell_grid[i].divergence = -(div_left - div_right + div_up - div_down) * overrelaxation_parameter;
+
+				bool is_free_up = true;
+				bool is_free_down = true;
+				bool is_free_left = true;
+				bool is_free_right = true;
+
+				if (x > 0)
 				{
-					is_free_left = false;
+					if (fluid_cell_grid[XYtoIndex(x - 1, y, grid_dimension)].is_blocked == true)
+					{
+						is_free_left = false;
+					}
 				}
-			}
-			if (x < N - 1)
-			{
-				if (fluid_cell_grid[XYtoIndex(x + 1, y, grid_dimension)].is_blocked == true)
+				if (x < N - 1)
 				{
-					is_free_right = false;
+					if (fluid_cell_grid[XYtoIndex(x + 1, y, grid_dimension)].is_blocked == true)
+					{
+						is_free_right = false;
+					}
 				}
-			}
-			if (y > 0)
-			{
-				if (fluid_cell_grid[XYtoIndex(x, y - 1, grid_dimension)].is_blocked == true)
+				if (y > 0)
 				{
-					is_free_up = false;
+					if (fluid_cell_grid[XYtoIndex(x, y - 1, grid_dimension)].is_blocked == true)
+					{
+						is_free_up = false;
+					}
 				}
-			}
-			if (y < N - 1)
-			{
-				if (fluid_cell_grid[XYtoIndex(x, y + 1, grid_dimension)].is_blocked == true)
+				if (y < N - 1)
 				{
-					is_free_down = false;
+					if (fluid_cell_grid[XYtoIndex(x, y + 1, grid_dimension)].is_blocked == true)
+					{
+						is_free_down = false;
+					}
 				}
+
+				int divisor = 4;
+
+				//if (x == N - 1 ||	!is_free_right)		divisor--;
+				if (!is_free_right)		divisor--;
+
+				if (x == 0		|| !is_free_left)		divisor--;
+				if (y == 0		|| !is_free_up)			divisor--;
+				if (y == N - 1	|| !is_free_down)		divisor--;
+
+				if (divisor == 0) divisor = 1;
+				float d = fluid_cell_grid[i].divergence / divisor;
+
+				//if (x < N - 1 && is_free_right) div_right -= d;
+				if (is_free_right) div_right -= d;
+
+				if (x > 0		&& is_free_left)	div_left += d;
+				if (y > 0		&& is_free_up)		div_up		+= d;
+				if (y < N - 1	&& is_free_down)	div_down	-= d;
 			}
-
-			int divisor = 4;
-
-			if (x == 0	||		!is_free_left)		divisor--;
-			//if (x == N - 1 ||	!is_free_right)		divisor--;
-			if (!is_free_right)		divisor--;
-			if (y == 0 ||		!is_free_up)		divisor--;
-			if (y == N - 1 ||	!is_free_down)		divisor--;
-
-			if (divisor == 0) divisor = 1;
-
-			float d = fluid_cell_grid[i].divergence / divisor;
-
-			if (x > 0 && is_free_left) div_left += d;
-			//if (x < N - 1 && is_free_right) div_right -= d;
-			if (is_free_right) div_right -= d;
-			if (y > 0 && is_free_up) div_up += d;
-			if (y < N - 1 && is_free_down) div_down -= d;
 		}
 	}
 
@@ -466,8 +463,10 @@ public:
 					divergence_vectors_y[XYtoIndex(x, y + 1, grid_dimension)]) / 4.0f;
 			}
 
-			float previous_position_x = x - x_component * delta_time;
-			float previous_position_y = y + 0.5f - y_component * delta_time;
+			float previous_position_x = (float)x - x_component * delta_time;
+			float previous_position_y = (float)y + 0.5f - y_component * delta_time;
+
+			if (previous_position_x <= 0.0f || previous_position_x >= grid_dimension || previous_position_y <= 0.0f || previous_position_y >= grid_dimension) continue;
 
 			divergence_vectors_x_previous[i] = find_velocity_x({ previous_position_x, previous_position_y });
 		}
@@ -481,8 +480,8 @@ public:
 			float y_component = divergence_vectors_y[i];
 			float x_component;
 
-			float x = IndextoXY(i, grid_dimension).x;
-			float y = IndextoXY(i, grid_dimension).y;
+			int x = IndextoXY(i, grid_dimension).x;
+			int y = IndextoXY(i, grid_dimension).y;
 
 			if (y == grid_dimension)
 			{
@@ -502,8 +501,10 @@ public:
 					divergence_vectors_x[XYtoIndex(x + 1, y, grid_dimension + 1)]) / 4.0f;
 			}
 
-			float previous_position_x = x + 0.5f - x_component * delta_time;
-			float previous_position_y = y - y_component * delta_time;
+			float previous_position_x = (float)x + 0.5f - x_component * delta_time;
+			float previous_position_y = (float)y - y_component * delta_time;
+
+			if (previous_position_x <= 0.0f || previous_position_x >= grid_dimension || previous_position_y <= 0.0f || previous_position_y >= grid_dimension) continue;
 
 			divergence_vectors_y_previous[i] = find_velocity_y({ previous_position_x, previous_position_y });
 		}
@@ -515,6 +516,33 @@ public:
 		}
 	}
 
+	void advect_smoke(float delta_time)
+	{
+		const int N = grid_dimension;
+
+		for (size_t i = 0; i < grid_dimension_sqr; i++)
+		{
+			if (fluid_cell_grid[i].is_blocked) continue;
+
+			int x = IndextoXY(i, grid_dimension).x;
+			int y = IndextoXY(i, grid_dimension).y;
+
+			float& div_up = divergence_vectors_y[XYtoIndex(x, y, N)];
+			float& div_down = divergence_vectors_y[XYtoIndex(x, y + 1, N)];
+			float& div_left = divergence_vectors_x[XYtoIndex(x, y, N + 1)];
+			float& div_right = divergence_vectors_x[XYtoIndex(x + 1, y, N + 1)];
+
+			fluid_cell_grid[i].velocity_vector = { (div_left + div_right) / 2.0f, (div_up + div_down) / 2.0f };
+			Vector2 previous_position = { (float)x + 0.5f - fluid_cell_grid[i].velocity_vector.x * delta_time,
+										(float)y + 0.5f - fluid_cell_grid[i].velocity_vector.y * delta_time };
+			fluid_cell_grid[i].smoke_density_previous = find_smoke_density(previous_position);
+		}
+
+		for (size_t i = 0; i < grid_dimension_sqr; i++)
+		{
+			fluid_cell_grid[i].smoke_density = fluid_cell_grid[i].smoke_density_previous;
+		}
+	}
 
 	void draw_cell_grid()
 	{
@@ -522,8 +550,8 @@ public:
 
 		for (size_t i = 0; i < grid_dimension_sqr; i++)
 		{
-			//cell_grid_pixels[i] = getColor(fluid_cell_grid[i].divergence);
-			if (!fluid_cell_grid[i].is_blocked) cell_grid_pixels[i] = { 33, 46, 82, 255 };
+			//if (!fluid_cell_grid[i].is_blocked) cell_grid_pixels[i] = { 33, 46, 82, 255 };
+			if (!fluid_cell_grid[i].is_blocked) cell_grid_pixels[i] = getColor(fluid_cell_grid[i].smoke_density);
 			else cell_grid_pixels[i] = { 156, 37, 66, 255 };
 		}
 
@@ -579,7 +607,7 @@ public:
 	{
 		const unsigned int vectors_per_side = 2;
 		const float thickness = 150.0f;
-		const float length_multiplier = 0.5f;
+		const float length_multiplier = 0.7f;
 
 		const int N = grid_dimension;
 		const float offset = (WINDOW_WIDTH - WINDOW_HEIGHT) / 2.0f;
@@ -662,7 +690,7 @@ public:
 
 					DrawLineEx({ index_x * cell_size + cell_offset * (2 * k + 1) + offset,									 index_y * cell_size + cell_offset * (2 * j + 1) },
 							   { index_x * cell_size + cell_offset * (2 * k + 1) + offset + x_component * length_multiplier, index_y * cell_size + cell_offset * (2 * j + 1) + y_component * length_multiplier},
-								thickness / grid_dimension, GRAY);
+								thickness / grid_dimension, ORANGE);
 				}
 			}
 		}
