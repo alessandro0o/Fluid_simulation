@@ -45,7 +45,7 @@ private:
 	std::vector<float> divergence_vectors_y_previous;
 
 	Vector2 mouse_pos_previous = { 0.0f, 0.0f };
-	const unsigned int solver_iterations = 40;
+	const unsigned int solver_iterations = 70;
 
 	float find_velocity_x(Vector2 pos)
 	{
@@ -74,7 +74,7 @@ private:
 			return vel_x * (pos.y + 0.5f);
 		}
 
-		if (pos.y < grid_dimension - 0.5f)
+		if (pos.y < (float)grid_dimension - 0.5f)
 		{
 			bottom_vel += divergence_vectors_x[XYtoIndex(x_index, y_index + 1, grid_dimension + 1)] * (1.0f - x_offset);
 			bottom_vel += divergence_vectors_x[XYtoIndex(x_index + 1, y_index + 1, grid_dimension + 1)] * (x_offset);
@@ -116,7 +116,7 @@ private:
 			return vel_y * (pos.x + 0.5f);
 		}
 
-		if (pos.x < grid_dimension - 0.5f)
+		if (pos.x < (float)grid_dimension - 0.5f)
 		{
 			right_vel += divergence_vectors_y[XYtoIndex(x_index + 1, y_index, grid_dimension)] * (1.0f - y_offset);
 			right_vel += divergence_vectors_y[XYtoIndex(x_index + 1, y_index + 1, grid_dimension)] * (y_offset);
@@ -134,15 +134,68 @@ private:
 	float find_smoke_density(Vector2 pos)
 	{
 		float smoke_density = 0.0f;
-		if (pos.x <= 0.0f || pos.x >= grid_dimension || pos.y <= 0.0f || pos.y >= grid_dimension) return 0.0f;
 
-		int x_index = std::floor(pos.x);
-		int y_index = std::floor(pos.y);
+		int x_index = std::floor(pos.x - 0.5f);
+		int y_index = std::floor(pos.y - 0.5f);
 
-		float x_offset = pos.x - x_index;
-		float y_offset = pos.y - y_index;
+		if (pos.x < 0.5f)
+		{
+			x_index = 0;
+		}
+		if (pos.y < 0.5f)
+		{
+			y_index = 0;
+		}
 
+		float x_offset = pos.x - 0.5f - x_index;
+		float y_offset = pos.y - 0.5f - y_index;
 
+		float top_density = 0.0f;
+		float bottom_density = 0.0f;
+
+		if (pos.x > 0.5f && pos.y > 0.5f && pos.y < (float)grid_dimension - 1.5f && pos.y < (float)grid_dimension - 1.5f)
+		{
+			top_density += fluid_cell_grid[XYtoIndex(x_index, y_index, grid_dimension)].smoke_density * (1.0f - x_offset);
+			top_density += fluid_cell_grid[XYtoIndex(x_index + 1, y_index, grid_dimension)].smoke_density * (x_offset);
+
+			bottom_density += fluid_cell_grid[XYtoIndex(x_index, y_index + 1, grid_dimension)].smoke_density * (1.0f - x_offset);
+			bottom_density += fluid_cell_grid[XYtoIndex(x_index + 1, y_index + 1, grid_dimension)].smoke_density * (x_offset);
+
+			smoke_density += top_density * (1.0f - y_offset);
+			smoke_density += bottom_density * (y_offset);
+
+			return smoke_density;
+		}
+		if (pos.x <= 0.5f && pos.y >= 0.5f && pos.y <= (float)grid_dimension - 1.5f)
+		{
+			top_density += fluid_cell_grid[XYtoIndex(x_index, y_index, grid_dimension)].smoke_density * (pos.x + 0.5f);
+			bottom_density += fluid_cell_grid[XYtoIndex(x_index, y_index + 1, grid_dimension)].smoke_density * (pos.x + 0.5f);
+			smoke_density += top_density * (1.0f - y_offset);
+			smoke_density += bottom_density * (y_offset);
+			return smoke_density;
+		}
+		if (pos.x >= (float)grid_dimension - 0.5f && pos.y >= 0.5f && pos.y <= (float)grid_dimension - 1.5f)
+		{
+			top_density += fluid_cell_grid[XYtoIndex(x_index, y_index, grid_dimension)].smoke_density * (1.0f - (x_offset + 0.5f));
+			bottom_density += fluid_cell_grid[XYtoIndex(x_index, y_index + 1, grid_dimension)].smoke_density * (1.0f - (x_offset + 0.5f));
+			smoke_density += top_density * (1.0f - y_offset);
+			smoke_density += bottom_density * (y_offset);
+			return smoke_density;
+		}
+		//if (pos.x <= 0.5f)
+		//{
+		//	top_density += fluid_cell_grid[XYtoIndex(x_index, y_index, grid_dimension)].smoke_density * (1.0f - x_offset);
+		//	top_density += fluid_cell_grid[XYtoIndex(x_index + 1, y_index, grid_dimension)].smoke_density * (x_offset);
+
+		//	if (pos.y < (float)grid_dimension - 0.5f)
+		//	{
+		//		bottom_density += fluid_cell_grid[XYtoIndex(x_index, y_index + 1, grid_dimension)].smoke_density * (1.0f - x_offset);
+		//		bottom_density += fluid_cell_grid[XYtoIndex(x_index + 1, y_index + 1, grid_dimension)].smoke_density * (x_offset);
+		//	}
+		//}
+
+		//smoke_density += top_density * (1.0f - y_offset);
+		//smoke_density += bottom_density * (y_offset);
 
 		return smoke_density;
 	}
@@ -223,6 +276,11 @@ public:
 				divergence_vectors_y[i] = 0.0f;
 				divergence_vectors_y_previous[i] = 0.0f;
 			}
+			for (size_t i = 0; i < grid_dimension_sqr; i++)
+			{
+				fluid_cell_grid[i].smoke_density = 0.0f;
+				fluid_cell_grid[i].smoke_density_previous = 0.0f;
+			}
 		}
 	}
 
@@ -289,9 +347,7 @@ public:
 
 			if (CheckCollisionPointRec(mouse_pos, { cell_pos_x, cell_pos_y, cell_size, cell_size }) && IsMouseButtonPressed(MOUSE_BUTTON_RIGHT))
 			{
-				if(fluid_cell_grid[i].is_blocked == true) fluid_cell_grid[i].is_blocked = false;
-				else fluid_cell_grid[i].is_blocked = true;
-
+				fluid_cell_grid[i].is_blocked = !fluid_cell_grid[i].is_blocked;
 			}
 
 			float& div_up = divergence_vectors_y[XYtoIndex(x, y, N)];
@@ -527,14 +583,16 @@ public:
 			int x = IndextoXY(i, grid_dimension).x;
 			int y = IndextoXY(i, grid_dimension).y;
 
-			float& div_up = divergence_vectors_y[XYtoIndex(x, y, N)];
-			float& div_down = divergence_vectors_y[XYtoIndex(x, y + 1, N)];
-			float& div_left = divergence_vectors_x[XYtoIndex(x, y, N + 1)];
-			float& div_right = divergence_vectors_x[XYtoIndex(x + 1, y, N + 1)];
+			float div_up = divergence_vectors_y[XYtoIndex(x, y, N)];
+			float div_down = divergence_vectors_y[XYtoIndex(x, y + 1, N)];
+			float div_left = divergence_vectors_x[XYtoIndex(x, y, N + 1)];
+			float div_right = divergence_vectors_x[XYtoIndex(x + 1, y, N + 1)];
 
 			fluid_cell_grid[i].velocity_vector = { (div_left + div_right) / 2.0f, (div_up + div_down) / 2.0f };
 			Vector2 previous_position = { (float)x + 0.5f - fluid_cell_grid[i].velocity_vector.x * delta_time,
 										(float)y + 0.5f - fluid_cell_grid[i].velocity_vector.y * delta_time };
+
+			if (previous_position.x <= 0.0f || previous_position.x >= grid_dimension - 1 || previous_position.y <= 0.0f || previous_position.y - 1 >= grid_dimension) continue;
 			fluid_cell_grid[i].smoke_density_previous = find_smoke_density(previous_position);
 		}
 
@@ -550,9 +608,9 @@ public:
 
 		for (size_t i = 0; i < grid_dimension_sqr; i++)
 		{
-			//if (!fluid_cell_grid[i].is_blocked) cell_grid_pixels[i] = { 33, 46, 82, 255 };
-			if (!fluid_cell_grid[i].is_blocked) cell_grid_pixels[i] = getColor(fluid_cell_grid[i].smoke_density);
-			else cell_grid_pixels[i] = { 156, 37, 66, 255 };
+			if (!fluid_cell_grid[i].is_blocked) cell_grid_pixels[i] = { 33, 46, 82, 255 };
+			//if (!fluid_cell_grid[i].is_blocked) cell_grid_pixels[i] = getColor(fluid_cell_grid[i].smoke_density);
+			else cell_grid_pixels[i] = { 158, 65, 45, 255 };
 		}
 
 		UpdateTexture(
@@ -690,7 +748,7 @@ public:
 
 					DrawLineEx({ index_x * cell_size + cell_offset * (2 * k + 1) + offset,									 index_y * cell_size + cell_offset * (2 * j + 1) },
 							   { index_x * cell_size + cell_offset * (2 * k + 1) + offset + x_component * length_multiplier, index_y * cell_size + cell_offset * (2 * j + 1) + y_component * length_multiplier},
-								thickness / grid_dimension, ORANGE);
+								thickness / grid_dimension, LIGHTGRAY);
 				}
 			}
 		}
