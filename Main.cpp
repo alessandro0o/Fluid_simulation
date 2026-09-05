@@ -56,7 +56,7 @@ int main(void)
 
         BeginDrawing();
         {
-            ClearBackground(BLACK);
+            ClearBackground({ 42, 52, 57, 255});
 
             fluid_grid.draw_cell_grid();
             fluid_grid.draw_interpolated_divergence_vectors();
