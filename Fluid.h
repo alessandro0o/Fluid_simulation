@@ -153,6 +153,27 @@ private:
 		float top_density = 0.0f;
 		float bottom_density = 0.0f;
 
+		if (pos.x <= 0.5f && pos.y <= 0.5f)
+		{
+			top_density = fluid_cell_grid[0].smoke_density * (pos.x + 0.5f);
+			return top_density * (pos.y + 0.5f);
+		}
+		if (pos.x >= (float)grid_dimension - 0.5f && pos.y <= 0.5f)
+		{
+			top_density = fluid_cell_grid[XYtoIndex(grid_dimension - 1, 0, grid_dimension)].smoke_density * (1.0f - (pos.x - (float)x_index + 0.5f));
+			return top_density * (pos.y + 0.5f);
+		}
+		if (pos.x <= 0.5f && pos.y >= (float)grid_dimension - 0.5f)
+		{
+			bottom_density = fluid_cell_grid[XYtoIndex(0, grid_dimension - 1, grid_dimension)].smoke_density * (pos.x + 0.5f);
+			return bottom_density * (1.0f - (pos.y - (float)y_index + 0.5f));
+		}
+		if (pos.x >= (float)grid_dimension - 0.5f && pos.y >= (float)grid_dimension - 0.5f)
+		{
+			bottom_density = fluid_cell_grid[XYtoIndex(grid_dimension - 1, grid_dimension - 1, grid_dimension)].smoke_density * (1.0f - (pos.x - (float)x_index + 0.5f));
+			return bottom_density * (1.0f - (pos.y - (float)y_index + 0.5f));
+		}
+
 		if (pos.x > 0.5f && pos.y > 0.5f && pos.y < (float)grid_dimension - 1.5f && pos.y < (float)grid_dimension - 1.5f)
 		{
 			top_density += fluid_cell_grid[XYtoIndex(x_index, y_index, grid_dimension)].smoke_density * (1.0f - x_offset);
@@ -166,36 +187,22 @@ private:
 
 			return smoke_density;
 		}
-		if (pos.x <= 0.5f && pos.y >= 0.5f && pos.y <= (float)grid_dimension - 1.5f)
+		if (pos.x < 0.5f && pos.y > 0.5f && pos.y < (float)grid_dimension - 0.5f)
 		{
-			top_density += fluid_cell_grid[XYtoIndex(x_index, y_index, grid_dimension)].smoke_density * (pos.x + 0.5f);
-			bottom_density += fluid_cell_grid[XYtoIndex(x_index, y_index + 1, grid_dimension)].smoke_density * (pos.x + 0.5f);
+			top_density += fluid_cell_grid[XYtoIndex(0, y_index, grid_dimension)].smoke_density * (pos.x + 0.5f);
+			bottom_density += fluid_cell_grid[XYtoIndex(0, y_index + 1, grid_dimension)].smoke_density * (pos.x + 0.5f);
 			smoke_density += top_density * (1.0f - y_offset);
 			smoke_density += bottom_density * (y_offset);
 			return smoke_density;
 		}
-		if (pos.x >= (float)grid_dimension - 0.5f && pos.y >= 0.5f && pos.y <= (float)grid_dimension - 1.5f)
+		if (pos.x > (float)grid_dimension - 0.5f && pos.y > 0.5f && pos.y < (float)grid_dimension - 0.5f)
 		{
-			top_density += fluid_cell_grid[XYtoIndex(x_index, y_index, grid_dimension)].smoke_density * (1.0f - (x_offset + 0.5f));
-			bottom_density += fluid_cell_grid[XYtoIndex(x_index, y_index + 1, grid_dimension)].smoke_density * (1.0f - (x_offset + 0.5f));
+			top_density += fluid_cell_grid[XYtoIndex(grid_dimension - 1, y_index, grid_dimension)].smoke_density * (1.0f - (pos.x - x_index + 0.5f));
+			bottom_density += fluid_cell_grid[XYtoIndex(grid_dimension - 1, y_index + 1, grid_dimension)].smoke_density * (1.0f - (pos.x - x_index + 0.5f));
 			smoke_density += top_density * (1.0f - y_offset);
 			smoke_density += bottom_density * (y_offset);
 			return smoke_density;
 		}
-		//if (pos.x <= 0.5f)
-		//{
-		//	top_density += fluid_cell_grid[XYtoIndex(x_index, y_index, grid_dimension)].smoke_density * (1.0f - x_offset);
-		//	top_density += fluid_cell_grid[XYtoIndex(x_index + 1, y_index, grid_dimension)].smoke_density * (x_offset);
-
-		//	if (pos.y < (float)grid_dimension - 0.5f)
-		//	{
-		//		bottom_density += fluid_cell_grid[XYtoIndex(x_index, y_index + 1, grid_dimension)].smoke_density * (1.0f - x_offset);
-		//		bottom_density += fluid_cell_grid[XYtoIndex(x_index + 1, y_index + 1, grid_dimension)].smoke_density * (x_offset);
-		//	}
-		//}
-
-		//smoke_density += top_density * (1.0f - y_offset);
-		//smoke_density += bottom_density * (y_offset);
 
 		return smoke_density;
 	}
@@ -302,11 +309,11 @@ public:
 
 		for (size_t i = 0; i < vector_num; i++)
 		{
-			int x_1 = IndextoXY(i, grid_dimension + 1).x;
-			int y_1 = IndextoXY(i, grid_dimension + 1).y;
+			int x_1 = i % (grid_dimension + 1);
+			int y_1 = i / (grid_dimension + 1);
 
-			int x_2 = IndextoXY(i, grid_dimension).x;
-			int y_2 = IndextoXY(i, grid_dimension).y;
+			int x_2 = i % grid_dimension;
+			int y_2 = i / grid_dimension;
 
 			if (CheckCollisionPointCircle({ x_1 * cell_size + offset, y_1 * cell_size + cell_size / 2.0f }, mouse_pos_current, effect_radius) &&
 				x_1 > 0 &&
@@ -339,8 +346,8 @@ public:
 
 		for (size_t i = 0; i < grid_dimension_sqr; i++)
 		{
-			int x = IndextoXY(i, grid_dimension).x;
-			int y = IndextoXY(i, grid_dimension).y;
+			int x = i % grid_dimension;
+			int y = i / grid_dimension;
 
 			float cell_pos_x = x * cell_size + offset;
 			float cell_pos_y = y * cell_size;
@@ -387,8 +394,8 @@ public:
 			{
 				if (fluid_cell_grid[i].is_blocked) continue;
 
-				const int x = IndextoXY(i, grid_dimension).x;
-				const int y = IndextoXY(i, grid_dimension).y;
+				const int x = i % grid_dimension;
+				const int y = i / grid_dimension;
 
 				float& div_up = divergence_vectors_y[XYtoIndex(x, y, N)];
 				float& div_down = divergence_vectors_y[XYtoIndex(x, y + 1, N)];
@@ -498,8 +505,8 @@ public:
 			float x_component = divergence_vectors_x[i];
 			float y_component = 0.0f;
 
-			int x = IndextoXY(i, grid_dimension + 1).x;
-			int y = IndextoXY(i, grid_dimension + 1).y;
+			int x = i % (grid_dimension + 1);
+			int y = i / (grid_dimension + 1);
 
 			if (x == grid_dimension)
 			{
@@ -536,8 +543,8 @@ public:
 			float y_component = divergence_vectors_y[i];
 			float x_component;
 
-			int x = IndextoXY(i, grid_dimension).x;
-			int y = IndextoXY(i, grid_dimension).y;
+			int x = i % grid_dimension;
+			int y = i / grid_dimension;
 
 			if (y == grid_dimension)
 			{
@@ -580,8 +587,8 @@ public:
 		{
 			if (fluid_cell_grid[i].is_blocked) continue;
 
-			int x = IndextoXY(i, grid_dimension).x;
-			int y = IndextoXY(i, grid_dimension).y;
+			int x = i % grid_dimension;
+			int y = i / grid_dimension;
 
 			float div_up = divergence_vectors_y[XYtoIndex(x, y, N)];
 			float div_down = divergence_vectors_y[XYtoIndex(x, y + 1, N)];
@@ -590,9 +597,9 @@ public:
 
 			fluid_cell_grid[i].velocity_vector = { (div_left + div_right) / 2.0f, (div_up + div_down) / 2.0f };
 			Vector2 previous_position = { (float)x + 0.5f - fluid_cell_grid[i].velocity_vector.x * delta_time,
-										(float)y + 0.5f - fluid_cell_grid[i].velocity_vector.y * delta_time };
+										  (float)y + 0.5f - fluid_cell_grid[i].velocity_vector.y * delta_time };
 
-			if (previous_position.x <= 0.0f || previous_position.x >= grid_dimension - 1 || previous_position.y <= 0.0f || previous_position.y - 1 >= grid_dimension) continue;
+			if (previous_position.x <= 0.0f || previous_position.x >= grid_dimension || previous_position.y <= 0.0f || previous_position.y >= grid_dimension) continue;
 			fluid_cell_grid[i].smoke_density_previous = find_smoke_density(previous_position);
 		}
 
@@ -608,9 +615,9 @@ public:
 
 		for (size_t i = 0; i < grid_dimension_sqr; i++)
 		{
-			if (!fluid_cell_grid[i].is_blocked) cell_grid_pixels[i] = { 33, 46, 82, 255 };
+			if (!fluid_cell_grid[i].is_blocked) cell_grid_pixels[i] = { 5,106,150, 255 };
 			//if (!fluid_cell_grid[i].is_blocked) cell_grid_pixels[i] = getColor(fluid_cell_grid[i].smoke_density);
-			else cell_grid_pixels[i] = { 158, 65, 45, 255 };
+			else cell_grid_pixels[i] = { 42, 52, 57, 255 };
 		}
 
 		UpdateTexture(
@@ -637,8 +644,8 @@ public:
 			if (divergence < 0.01f && divergence > 0.01f) divergence = 0.0f;
 
 			DrawText(TextFormat("%.1f", divergence),
-				IndextoXY(i, grid_dimension).x * cell_size + offset + cell_size / 4,
-				IndextoXY(i, grid_dimension).y * cell_size + cell_size / 3,
+				i % grid_dimension * cell_size + offset + cell_size / 4,
+				i / grid_dimension * cell_size + cell_size / 3,
 				(400 / grid_dimension),
 				WHITE);
 		}
@@ -677,16 +684,13 @@ public:
 		{
 			if (fluid_cell_grid[i].is_blocked == true) continue;
 
-			const int x = i % N;
-			const int y = i / N;
+			int x = i % N;
+			int y = i / N;
 
 			float div_up = divergence_vectors_y[XYtoIndex(x, y, N)];
 			float div_down = divergence_vectors_y[XYtoIndex(x, y + 1, N)];
 			float div_left = divergence_vectors_x[XYtoIndex(x, y, N + 1)];
 			float div_right = divergence_vectors_x[XYtoIndex(x + 1, y, N + 1)];
-
-			float index_x = IndextoXY(i, grid_dimension).x;
-			float index_y = IndextoXY(i, grid_dimension).y;
 
 			for (size_t j = 0; j < vectors_per_side; j++)
 			{
@@ -746,8 +750,8 @@ public:
 						}
 					}
 
-					DrawLineEx({ index_x * cell_size + cell_offset * (2 * k + 1) + offset,									 index_y * cell_size + cell_offset * (2 * j + 1) },
-							   { index_x * cell_size + cell_offset * (2 * k + 1) + offset + x_component * length_multiplier, index_y * cell_size + cell_offset * (2 * j + 1) + y_component * length_multiplier},
+					DrawLineEx({ (float)x * cell_size + cell_offset * (2 * k + 1) + offset,										(float)y * cell_size + cell_offset * (2 * j + 1) },
+							   { (float)x * cell_size + cell_offset * (2 * k + 1) + offset + x_component * length_multiplier,	(float)y * cell_size + cell_offset * (2 * j + 1) + y_component * length_multiplier},
 								thickness / grid_dimension, LIGHTGRAY);
 				}
 			}
