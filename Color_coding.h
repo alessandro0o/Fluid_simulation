@@ -5,9 +5,9 @@ Color getColor(float value)
 {
     Color c;
 
-    unsigned char m = value * 255;
+    unsigned char m = 255 - value * 255;
 
-    c = { 255, 255, 255, m };
+    c = { m, m, m, 255 };
 
     return c;
 }
