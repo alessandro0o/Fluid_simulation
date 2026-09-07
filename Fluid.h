@@ -45,7 +45,7 @@ private:
 	std::vector<float> divergence_vectors_y_previous;
 
 	Vector2 mouse_pos_previous = { 0.0f, 0.0f };
-	const unsigned int solver_iterations = 70;
+	const unsigned int solver_iterations = 80;
 
 	float find_velocity_x(Vector2 pos)
 	{
@@ -318,19 +318,15 @@ public:
 			if (CheckCollisionPointCircle({ x_1 * cell_size + offset, y_1 * cell_size + cell_size / 2.0f }, mouse_pos_current, effect_radius) &&
 				x_1 > 0 &&
 				x_1 < grid_dimension &&
-				y_1 > 0 &&
-				y_1 < grid_dimension - 1
-				&& IsMouseButtonDown(MOUSE_BUTTON_LEFT))
+				IsMouseButtonDown(MOUSE_BUTTON_LEFT))
 			{
 				divergence_vectors_x[i] += mouse_vel_x * effect_strength;
 			}
 
 			if (CheckCollisionPointCircle({ x_2 * cell_size + offset + cell_size / 2.0f, y_2 * cell_size }, mouse_pos_current, effect_radius) &&
-				x_2 > 0 &&
-				x_2 < grid_dimension - 1 &&
 				y_2 > 0 &&
-				y_2 < grid_dimension
-				&& IsMouseButtonDown(MOUSE_BUTTON_LEFT))
+				y_2 < grid_dimension &&
+				IsMouseButtonDown(MOUSE_BUTTON_LEFT))
 			{
 				divergence_vectors_y[i] += mouse_vel_y * effect_strength;
 			}
@@ -344,26 +340,30 @@ public:
 		Vector2 mouse_pos = GetMousePosition();
 		const int N = grid_dimension;
 
+		mouse_pos.x -= offset;
+		mouse_pos.x /= cell_size;
+		mouse_pos.y /= cell_size;
+
+		int x = std::floor(mouse_pos.x);
+		int y = std::floor(mouse_pos.y);
+
+		if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT))
+		{
+			fluid_cell_grid[XYtoIndex(x, y, grid_dimension)].is_blocked = !fluid_cell_grid[XYtoIndex(x, y, grid_dimension)].is_blocked;
+		}
+
 		for (size_t i = 0; i < grid_dimension_sqr; i++)
 		{
-			int x = i % grid_dimension;
-			int y = i / grid_dimension;
-
-			float cell_pos_x = x * cell_size + offset;
-			float cell_pos_y = y * cell_size;
-
-			if (CheckCollisionPointRec(mouse_pos, { cell_pos_x, cell_pos_y, cell_size, cell_size }) && IsMouseButtonPressed(MOUSE_BUTTON_RIGHT))
-			{
-				fluid_cell_grid[i].is_blocked = !fluid_cell_grid[i].is_blocked;
-			}
-
-			float& div_up = divergence_vectors_y[XYtoIndex(x, y, N)];
-			float& div_down = divergence_vectors_y[XYtoIndex(x, y + 1, N)];
-			float& div_left = divergence_vectors_x[XYtoIndex(x, y, N + 1)];
-			float& div_right = divergence_vectors_x[XYtoIndex(x + 1, y, N + 1)];
-
 			if (fluid_cell_grid[i].is_blocked)
 			{
+				x = i % N;
+				y = i / N;
+
+				float& div_up = divergence_vectors_y[XYtoIndex(x, y, N)];
+				float& div_down = divergence_vectors_y[XYtoIndex(x, y + 1, N)];
+				float& div_left = divergence_vectors_x[XYtoIndex(x, y, N + 1)];
+				float& div_right = divergence_vectors_x[XYtoIndex(x + 1, y, N + 1)];
+
 				div_up = 0.0f;
 				div_down = 0.0f;
 				div_left = 0.0f;
@@ -384,7 +384,7 @@ public:
 
 	void solve_incompressibility()
 	{
-		constexpr float overrelaxation_parameter = 1.7f;
+		constexpr float overrelaxation_parameter = 1.9f;
 
 		const int N = grid_dimension;
 
@@ -440,20 +440,20 @@ public:
 
 				int divisor = 4;
 
-				//if (x == N - 1 ||	!is_free_right)		divisor--;
-				if (!is_free_right)		divisor--;
+				//if (x == N - 1	||	!is_free_right)		divisor--;
+				if (!is_free_right)						divisor--;
 
-				if (x == 0		|| !is_free_left)		divisor--;
-				if (y == 0		|| !is_free_up)			divisor--;
-				if (y == N - 1	|| !is_free_down)		divisor--;
+				if (x == 0		||	!is_free_left)		divisor--;
+				if (y == 0		||	!is_free_up)		divisor--;
+				if (y == N - 1	||	!is_free_down)		divisor--;
 
-				if (divisor == 0) divisor = 1;
+				if (divisor == 0) continue;
 				float d = fluid_cell_grid[i].divergence / divisor;
 
-				//if (x < N - 1 && is_free_right) div_right -= d;
-				if (is_free_right) div_right -= d;
+				//if (x < N - 1 && is_free_right)		div_right	-= d;
+				if (is_free_right) div_right					-= d;
 
-				if (x > 0		&& is_free_left)	div_left += d;
+				if (x > 0		&& is_free_left)	div_left	+= d;
 				if (y > 0		&& is_free_up)		div_up		+= d;
 				if (y < N - 1	&& is_free_down)	div_down	-= d;
 			}
@@ -529,7 +529,15 @@ public:
 			float previous_position_x = (float)x - x_component * delta_time;
 			float previous_position_y = (float)y + 0.5f - y_component * delta_time;
 
-			if (previous_position_x <= 0.0f || previous_position_x >= grid_dimension || previous_position_y <= 0.0f || previous_position_y >= grid_dimension) continue;
+			if (previous_position_x <= 0.0f ||
+				previous_position_x >= grid_dimension ||
+				previous_position_y <= 0.0f ||
+				previous_position_y >= grid_dimension) continue;
+
+			int x_index = std::floor(previous_position_x);
+			int y_index = std::floor(previous_position_y);
+
+			if (fluid_cell_grid[XYtoIndex(x_index, y_index, grid_dimension)].is_blocked) continue;
 
 			divergence_vectors_x_previous[i] = find_velocity_x({ previous_position_x, previous_position_y });
 		}
@@ -567,7 +575,15 @@ public:
 			float previous_position_x = (float)x + 0.5f - x_component * delta_time;
 			float previous_position_y = (float)y - y_component * delta_time;
 
-			if (previous_position_x <= 0.0f || previous_position_x >= grid_dimension || previous_position_y <= 0.0f || previous_position_y >= grid_dimension) continue;
+			if (previous_position_x <= 0.0f ||
+				previous_position_x >= grid_dimension ||
+				previous_position_y <= 0.0f ||
+				previous_position_y >= grid_dimension) continue;
+
+			int x_index = std::floor(previous_position_x);
+			int y_index = std::floor(previous_position_y);
+
+			if (fluid_cell_grid[XYtoIndex(x_index, y_index, grid_dimension)].is_blocked) continue;
 
 			divergence_vectors_y_previous[i] = find_velocity_y({ previous_position_x, previous_position_y });
 		}
